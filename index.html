@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Bus Simulation</title>
+    <title>Bus Simulation with Routing</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
     <style>
         #map {
             height: 500px;
@@ -12,57 +13,73 @@
 <body>
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
     <script>
         // Initialize the map
         const map = L.map('map').setView([-1.286389, 36.817223], 13);
-
+        
         // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // Define the route (array of lat-lng points)
-        const route = [
-            [-1.286389, 36.817223], // Start point (Nairobi CBD)
-            [-1.292066, 36.821945], // Uhuru Park
-            [-1.301428, 36.776025], // Wilson Airport
-            [-1.320152, 36.802490], // Langata
-            [-1.328449, 36.856213]  // End point (Karen)
+        // Define the waypoints for the route
+        const waypoints = [
+            L.latLng(-1.286389, 36.817223),   // Start point (Nairobi CBD)
+            L.latLng(-1.292066, 36.821945),   // Uhuru Park
+            L.latLng(-1.301428, 36.776025),   // Wilson Airport
+            L.latLng(-1.320152, 36.802490),   // Langata
+            L.latLng(-1.328449, 36.856213)    // End point (Karen)
         ];
 
-        // Add a polyline to visualize the route
-        const polyline = L.polyline(route, { color: 'blue' }).addTo(map);
+        // Create a routing control
+        const routingControl = L.Routing.control({
+            waypoints: waypoints,
+            routeWhileDragging: false,
+            show: false,
+            addWaypoints: false,
+            router: L.Routing.osrmv1({
+                serviceUrl: 'https://router.project-osrm.org/route/v1'
+            })
+        }).addTo(map);
 
-        // Add a marker to represent the bus
-        const busMarker = L.marker(route[0]).addTo(map);
+        // Create a bus marker
+        const busMarker = L.marker(waypoints[0]).addTo(map);
 
-        // Function to move the marker along the route
-        let currentIndex = 0;
+        // Function to simulate bus movement along the route
         function moveBus() {
-            if (currentIndex < route.length - 1) {
-                const [startLat, startLng] = route[currentIndex];
-                const [endLat, endLng] = route[currentIndex + 1];
+            // Wait for routing to complete
+            routingControl.on('routesfound', function(e) {
+                const routes = e.routes;
+                if (routes.length > 0) {
+                    const route = routes[0];
+                    const coordinates = route.coordinates;
+                    
+                    let currentIndex = 0;
+                    const steps = coordinates.length;
 
-                // Increment position for smooth movement
-                const steps = 100; // Adjust for smoother animation
-                let step = 0;
+                    function animateBus() {
+                        if (currentIndex < steps) {
+                            const currentCoord = coordinates[currentIndex];
+                            busMarker.setLatLng([currentCoord.lat, currentCoord.lng]);
+                            currentIndex++;
 
-                const interval = setInterval(() => {
-                    if (step <= steps) {
-                        const lat = startLat + (step / steps) * (endLat - startLat);
-                        const lng = startLng + (step / steps) * (endLng - startLng);
-                        busMarker.setLatLng([lat, lng]);
-                        step++;
-                    } else {
-                        clearInterval(interval);
-                        currentIndex++;
-                        moveBus(); // Move to the next segment
+                            // Adjust speed of animation (lower number = slower)
+                            setTimeout(animateBus, 50);
+                        } else {
+                            // Loop back to start
+                            currentIndex = 0;
+                            animateBus();
+                        }
                     }
-                }, 50); // Adjust for speed
-            }
+
+                    // Start bus animation
+                    animateBus();
+                }
+            });
         }
 
-        // Start the simulation
+        // Start the simulation when routing is ready
         moveBus();
     </script>
 </body>
