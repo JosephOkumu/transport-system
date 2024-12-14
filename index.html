@@ -1,39 +1,69 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vehicle Tracker</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <title>Bus Simulation</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
         #map {
-            height: 100vh;
+            height: 500px;
         }
     </style>
 </head>
 <body>
     <div id="map"></div>
-
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         // Initialize the map
-        const map = L.map('map').setView([-1.286389, 36.817223], 13); // Centered at Nairobi
+        const map = L.map('map').setView([-1.286389, 36.817223], 13);
 
         // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // Add a marker for the vehicle
-        const vehicleMarker = L.marker([-1.286389, 36.817223]).addTo(map);
+        // Define the route (array of lat-lng points)
+        const route = [
+            [-1.286389, 36.817223], // Start point (Nairobi CBD)
+            [-1.292066, 36.821945], // Uhuru Park
+            [-1.301428, 36.776025], // Wilson Airport
+            [-1.320152, 36.802490], // Langata
+            [-1.328449, 36.856213]  // End point (Karen)
+        ];
 
-        // Connect to the SSE endpoint
-        const eventSource = new EventSource('http://localhost:8080/stream-location');
-        eventSource.onmessage = (event) => {
-            const location = JSON.parse(event.data);
-            vehicleMarker.setLatLng([location.latitude, location.longitude]);
-            map.setView([location.latitude, location.longitude]);
-        };
+        // Add a polyline to visualize the route
+        const polyline = L.polyline(route, { color: 'blue' }).addTo(map);
+
+        // Add a marker to represent the bus
+        const busMarker = L.marker(route[0]).addTo(map);
+
+        // Function to move the marker along the route
+        let currentIndex = 0;
+        function moveBus() {
+            if (currentIndex < route.length - 1) {
+                const [startLat, startLng] = route[currentIndex];
+                const [endLat, endLng] = route[currentIndex + 1];
+
+                // Increment position for smooth movement
+                const steps = 100; // Adjust for smoother animation
+                let step = 0;
+
+                const interval = setInterval(() => {
+                    if (step <= steps) {
+                        const lat = startLat + (step / steps) * (endLat - startLat);
+                        const lng = startLng + (step / steps) * (endLng - startLng);
+                        busMarker.setLatLng([lat, lng]);
+                        step++;
+                    } else {
+                        clearInterval(interval);
+                        currentIndex++;
+                        moveBus(); // Move to the next segment
+                    }
+                }, 50); // Adjust for speed
+            }
+        }
+
+        // Start the simulation
+        moveBus();
     </script>
 </body>
 </html>
